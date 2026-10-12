@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <linearGradient id="snapGrad" x1="64" y1="64" x2="448" y2="448" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#38BDF8"/>
+      <stop offset="50%" stop-color="#6366F1"/>
+      <stop offset="100%" stop-color="#A855F7"/>
+    </linearGradient>
+    <linearGradient id="docGrad" x1="128" y1="128" x2="384" y2="384" gradientUnits="userSpaceOnUse">
+      <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.95"/>
+      <stop offset="100%" stop-color="#E2E8F0" stop-opacity="0.85"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Flowing pages/cards background stack -->
+  <g opacity="0.55">
+    <rect x="140" y="80" width="260" height="320" rx="20" fill="url(#snapGrad)" transform="rotate(8 270 240)"/>
+  </g>
+  <g opacity="0.8">
+    <rect x="110" y="100" width="260" height="320" rx="20" fill="url(#snapGrad)" transform="rotate(4 240 260)"/>
+  </g>
+
+  <!-- Main Document / Browser Page -->
+  <rect x="96" y="96" width="320" height="320" rx="24" fill="url(#docGrad)" stroke="url(#snapGrad)" stroke-width="16" stroke-linejoin="round"/>
+
+  <!-- Viewport / Content Placeholder lines -->
+  <rect x="136" y="160" width="140" height="24" rx="6" fill="#6366F1" opacity="0.25"/>
+  <rect x="136" y="208" width="240" height="16" rx="4" fill="#6366F1" opacity="0.15"/>
+  <rect x="136" y="240" width="190" height="16" rx="4" fill="#6366F1" opacity="0.15"/>
+
+  <!-- Corner Crop / Snapshot Target Reticle -->
+  <path d="M 340 312 L 376 312 A 20 20 0 0 1 396 332 L 396 368" stroke="url(#snapGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M 172 396 L 136 396 A 20 20 0 0 1 116 376 L 116 340" stroke="url(#snapGrad)" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Glowing Shutter / Capture Focus Dot -->
+  <circle cx="360" cy="156" r="16" fill="url(#snapGrad)"/>
+</svg>
