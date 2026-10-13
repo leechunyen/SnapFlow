@@ -41,7 +41,7 @@
 
 6. **Appearance & Themes**:
    - Seamlessly toggle between **Light**, **Dark**, and **System** appearance modes on the fly.
-   - User theme preferences are automatically persisted in `~/.snapflow/config.json`.
+   - User theme preferences are automatically persisted in the hidden user directory (`~/.snapflow/config.json`, automatically hidden on macOS, Linux, and Windows).
 
 7. **Internationalization (i18n)**:
    - Full multi-language GUI support for:
@@ -302,7 +302,7 @@ SnapFlow/
 ├── images/                  # Application icons (.icns, .ico, .svg, .png)
 └── src/                     # Core source code
     ├── app.py               # Main GUI controller, event dispatching, window/dock icon setup
-    ├── config_manager.py    # Persistent configuration store (~/.snapflow/config.json)
+    ├── config_manager.py    # Persistent configuration store in hidden directory (~/.snapflow/config.json)
     ├── browser_manager.py   # Playwright worker thread, active tab tracker, range capture stitching
     ├── screenshot_model.py  # Screenshot data model, ordering, validation, export states
     ├── ui/

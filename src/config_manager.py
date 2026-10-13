@@ -47,10 +47,23 @@ class ConfigManager:
         """Persists current configuration to disk."""
         try:
             CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+            self._ensure_hidden_on_windows(CONFIG_DIR)
             with open(CONFIG_FILE, "w", encoding="utf-8") as f:
                 json.dump(self._data, f, ensure_ascii=False, indent=2)
         except OSError as e:
             print(f"[ConfigManager] Warning: failed to save config: {e}")
+
+    @staticmethod
+    def _ensure_hidden_on_windows(path: Path) -> None:
+        """Ensures the directory is marked as hidden on Windows file systems."""
+        import sys
+        if sys.platform.startswith("win"):
+            try:
+                import ctypes
+                FILE_ATTRIBUTE_HIDDEN = 0x02
+                ctypes.windll.kernel32.SetFileAttributesW(str(path), FILE_ATTRIBUTE_HIDDEN)
+            except Exception:
+                pass
 
     def get(self, key: str, fallback: Any = None) -> Any:
         """Retrieves a configuration value."""
