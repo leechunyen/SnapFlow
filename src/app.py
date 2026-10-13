@@ -34,6 +34,9 @@ class SnapFlowApp(ctk.CTk):
         self.minsize(960, 600)
         self._setup_window_icon()
 
+        # Clean up stale temp directories from dead prior sessions
+        file_utils.cleanup_orphan_temp_dirs()
+
         # Initialize models & browser manager
         self.model = ScreenshotModel()
         self.browser_mgr = BrowserManager(
@@ -211,7 +214,8 @@ class SnapFlowApp(ctk.CTk):
 
     def _on_list_updated(self) -> None:
         """Invoked when screenshots list or order changes."""
-        self.export_panel.update_states()
+        if hasattr(self, "export_panel"):
+            self.export_panel.update_states()
 
     # ------------------ Browser Event Callbacks ------------------
 
@@ -263,6 +267,9 @@ class SnapFlowApp(ctk.CTk):
     def _handle_browser_error_event(self, err_msg: str) -> None:
         def on_ui_thread() -> None:
             self._hide_loading()
+            self.toolbar.set_range_mode(False)
+            if not self.browser_mgr.is_running:
+                self.toolbar.set_browser_running(False, was_closed=True)
             messagebox.showerror(i18n.t("app_title"), f"Browser Error: {err_msg}")
 
         self.after(0, on_ui_thread)

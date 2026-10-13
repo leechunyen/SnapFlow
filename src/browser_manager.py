@@ -423,25 +423,26 @@ class BrowserManager:
 
         if trigger_lazy_load:
             try:
-                # 2. Trigger lazy images via incremental scroll and give JS observers time to process
+                # 2. Trigger lazy images via incremental scroll (snapshot initial height to prevent infinite scroll runaway)
                 page.evaluate("""async () => {
-                    const scrollHeight = Math.max(
+                    const initialHeight = Math.max(
                         document.body ? document.body.scrollHeight : 0,
                         document.documentElement ? document.documentElement.scrollHeight : 0
                     );
-                    const step = window.innerHeight || 800;
-                    for (let y = 0; y < Math.min(scrollHeight, 15000); y += step) {
+                    const maxScanHeight = Math.min(initialHeight, 10000);
+                    const step = Math.max(window.innerHeight || 800, 600);
+                    for (let y = 0; y < maxScanHeight; y += step) {
                         window.scrollTo(0, y);
-                        await new Promise(r => setTimeout(r, 60));
+                        await new Promise(r => setTimeout(r, 40));
                     }
                     // CRITICAL: Always scroll back to the very top so the page is at (0, 0)
                     window.scrollTo(0, 0);
                 }""")
                 # Let lazy network image requests settle
                 try:
-                    page.wait_for_load_state("networkidle", timeout=1200)
+                    page.wait_for_load_state("networkidle", timeout=800)
                 except Exception:
-                    time.sleep(0.3)
+                    time.sleep(0.2)
                 # Extra ensure scroll at top
                 page.evaluate("() => window.scrollTo(0, 0)")
             except Exception:
@@ -709,20 +710,26 @@ class BrowserManager:
                 except Exception:
                     pass
 
-            # Stitch all slices together with Pillow using float precision to avoid DPI rounding seam gaps
+            # Stitch all slices together with Pillow using exact pixel boundary tracking to avoid DPI rounding seam gaps
             scale_factor = slices[0][0].width / viewport_w if viewport_w > 0 else 1.0
             stitched_w = slices[0][0].width
-            stitched_h = max(1, round(total_range_h * scale_factor))
 
-            stitched = Image.new("RGB", (stitched_w, stitched_h), (255, 255, 255))
-            for s_img, slice_crop_y, take_h, canvas_y in slices:
+            # Calculate slice boundaries precisely without gaps
+            processed_slices: list[tuple[Image.Image, int, int, int]] = []
+            curr_y = 0
+            for i, (s_img, slice_crop_y, take_h, canvas_y) in enumerate(slices):
                 scaled_crop_y = round(slice_crop_y * scale_factor)
-                scaled_take_h = round(take_h * scale_factor)
-                scaled_canvas_y = round(canvas_y * scale_factor)
+                next_boundary = round((canvas_y + take_h) * scale_factor)
+                actual_h = max(1, next_boundary - curr_y)
+                processed_slices.append((s_img, scaled_crop_y, actual_h, curr_y))
+                curr_y = next_boundary
 
-                crop_box = (0, scaled_crop_y, stitched_w, min(s_img.height, scaled_crop_y + scaled_take_h))
+            stitched_h = max(1, curr_y)
+            stitched = Image.new("RGB", (stitched_w, stitched_h), (255, 255, 255))
+            for s_img, scaled_crop_y, actual_h, paste_y in processed_slices:
+                crop_box = (0, scaled_crop_y, stitched_w, min(s_img.height, scaled_crop_y + actual_h))
                 cropped = s_img.crop(crop_box)
-                stitched.paste(cropped, (0, scaled_canvas_y))
+                stitched.paste(cropped, (0, paste_y))
                 s_img.close()
 
             buf = io.BytesIO()

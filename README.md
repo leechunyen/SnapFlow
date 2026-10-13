@@ -12,32 +12,27 @@
    - Dynamically tracks the **active tab**, page title, and live URL, allowing tab switching directly via the GUI dropdown menu.
    - Safe shutdown lifecycle: shuts down tabs and contexts gracefully to eliminate process crashes (`SIGTRAP`) on macOS.
 
-2. **Three Capture Modes & Adjustable Delay Slider (1s – 5s)**:
-   - **📸 Viewport Capture**: Instantly grabs the currently visible browser screen area.
-   - **📑 Full Page Capture**: Automatically scrolls to the very top and captures the entire scrollable webpage in high definition.
-   - **📍 Scroll Range Capture (To Position)**:
-     - Mark a starting position, scroll down to any target position, and confirm capture.
-     - **Smart Sticky Header Handling**: Naturally preserves navigation and search bars at the very top of the page while automatically hiding fixed/sticky elements during subsequent scroll slices to prevent duplicate sticky headers.
-     - **High-DPI / Retina Screen Stitching**: Sub-pixel floating-point coordinate alignment and bottom boundary clamping ensure seamless stitching without seams or overlapping lines.
-   - **⏱️ Adjustable Capture Delay Slider (1s – 5s)**:
-     - Located prominently on the toolbar's capture row, allowing users to freely adjust the stabilization delay from **1 to 5 seconds**.
-     - **Why it matters**: Modern websites frequently use scroll-triggered JavaScript animations (e.g., AOS, GSAP, WOW.js) and lazy-loaded images (`IntersectionObserver`). The delay gives external assets, web fonts, and asynchronous network requests sufficient time to render completely before the shot is taken.
-     - **Zero Side-Effects**: SnapFlow freezes animations during the capture and immediately restores normal browser rendering via guaranteed cleanup (`finally` block) once the capture finishes.
-     - **Auto-Saved Preference**: Your chosen delay value is automatically persisted to `~/.snapflow/config.json` and remembered across app restarts.
+2. **Three Capture Modes & Adjustable Delay (1s – 5s)**:
+   - **📸 Viewport Capture**: Instantly grabs the visible browser screen area.
+   - **📑 Full Page Capture**: Faithful full-height capture with smart sticky header handling and infinite-scroll protection.
+   - **📍 Scroll Range Capture**: Pinpoint start and end scroll offsets with sub-pixel seamless stitching.
+   - **⏱️ Adjustable Capture Delay**: Stabilizes dynamic JS animations and lazy-loaded assets before taking shots. (See [User Guide & Capture Delay](#-user-guide--capture-delay) below for in-depth details).
 
 3. **Loading Modal & Anti-Spam Protection**:
    - Displays an animated loading modal during screenshot captures, range stitching, and application shutdown.
    - Intercepts and blocks user clicks during operations to prevent duplicate requests or UI freezes.
+   - Synchronizes toolbar state gracefully even if the external browser is abruptly closed or crashed during capture.
 
 4. **Preview, Multi-Selection & List Management**:
    - **Full-Width Scrollable Preview**: Renders long full-page screenshots at full readable width, enabling smooth vertical scrolling inspection.
-   - **Adaptive List Display & Auto-Scroll**: Dynamically measures available pixel width and fits screenshot titles cleanly, maximizing visible text. Automatically scrolls down to the newest item upon capture so you never miss a shot.
+   - **Adaptive List Display & Resize Debounce**: Dynamically measures available pixel width and fits screenshot titles cleanly. Debounces resize events to maintain smooth 60fps responsiveness even with dozens of screenshots.
+   - **Multi-Selection Preview Clarity**: When multiple items are selected (`Ctrl` / `Cmd`), the single-item preview panel cleanly hides to prevent confusion, while export actions automatically adapt to batch operations.
    - **Custom Renaming & Duplicate Detection**: Rename captures on the fly with instant validation and character sanitization.
-   - **Single & Multi-Select Operations**:
+   - **Precise Action Controls**:
      - Single item: move up (`▲`), move down (`▼`), or rename (`✏️`).
      - Multi-select: hold `Ctrl` or `Cmd` to select multiple captures for bulk deletion or selective export.
-     - Automatically disables move and rename buttons during multi-selection to prevent state desynchronization.
-     - Direct mouse **drag-and-drop** reordering.
+     - Explicit movement via dedicated action buttons (`▲ Up` / `▼ Down`), avoiding accidental jumps from click-dragging.
+     - Debounced "Copy URL" with non-overlapping visual feedback timer.
 
 5. **Flexible Export Options**:
    - **Smart Scope Detection**: Dynamically toggles between "Export All" and "Export Selected" depending on current list selection.
@@ -49,12 +44,16 @@
    - User theme preferences are automatically persisted in `~/.snapflow/config.json`.
 
 7. **Internationalization (i18n)**:
-   - Full localization support for **English (`en_us`)**, **Traditional Chinese (`zh_tw`)**, and **Malay (`ms_my`)**.
-   - In-memory dictionary caching with dynamic runtime language switching.
+   - Full multi-language GUI support for:
+     - 🇺🇸 **English** (`en_us`)
+     - 🇹🇼 **Traditional Chinese (繁體中文)** (`zh_tw`)
+     - 🇲🇾 **Malay (Bahasa Melayu)** (`ms_my`)
+   - Automatic system locale detection on launch with dynamic runtime language switching in the toolbar.
 
-8. **Unsaved Changes Safety & Temp Cleanup**:
+8. **Unsaved Changes Safety & Temp Directory Recovery**:
    - Prompts for confirmation when closing the application with unexported screenshots.
    - Automatically cleans up all temporary screenshot files upon exit to save disk space.
+   - Detects and cleans up orphaned temporary folders left behind by past system crashes on startup.
 
 ---
 
@@ -155,6 +154,9 @@ pip install -r requirements.txt
 - `Pillow>=10.3.0`: High-resolution slicing, stitching, thumbnailing, and PDF compilation
 - `darkdetect>=0.8.0`: Cross-platform OS appearance mode detection
 
+**Optional Packages**:
+- `pyobjc-framework-Cocoa>=10.0` (macOS only): Enables native Dock icon badge rendering and system language auto-detection. Can be installed via `pip install pyobjc-framework-Cocoa`.
+
 ---
 
 ### Step 4: Install Playwright Browser Binaries
@@ -185,19 +187,54 @@ python main.py
 You can override the language or appearance mode on startup via CLI flags:
 
 ```bash
-# Launch in English with Dark theme
+# Launch with specific language and theme
 python main.py --lang en_us --theme dark
-
-# Launch in Traditional Chinese
-python main.py --lang zh_tw
-
-# Launch in Malay following system appearance mode
+python main.py --lang zh_tw --theme light
 python main.py --lang ms_my --theme system
 ```
 
 **Available CLI Options**:
 - `--lang`: `en_us` (English), `zh_tw` (Traditional Chinese), `ms_my` (Malay)
 - `--theme`: `light`, `dark`, `system`
+
+---
+
+## 📖 User Guide & Capture Delay
+
+### ⏱️ Understanding "Capture Delay"
+In the toolbar next to the active tabs selector, you will find the **Capture Delay** slider (ranging from **1s to 5s**).
+
+#### Why is Capture Delay necessary?
+Modern web applications are dynamic and asynchronous:
+1. **Scroll-triggered animations**: Many websites use libraries such as AOS, GSAP, WOW.js, or Framer Motion that trigger fade-in, slide-up, or zoom effects only when scrolled into view.
+2. **Lazy-loaded images & iframes**: Images and media using `loading="lazy"` or `IntersectionObserver` require time to request, download, and decode after scrolling.
+3. **Dynamic font rendering & web fonts**: Custom web fonts often take a fraction of a second to swap and stabilize layout geometry.
+4. **Interactive Single Page Apps (SPAs)**: Content loaded on demand (e.g. charts, social embeds, comments) needs a brief stabilization period.
+
+#### How to use it:
+- **Default (2s - 3s)**: Ideal for most standard corporate, blog, or documentation sites.
+- **Fast / Static Sites (1s)**: Suitable for simple static HTML pages or dashboards where content is fully rendered immediately.
+- **Heavy / Animation-Rich Sites (4s - 5s)**: Recommended for rich landing pages, e-commerce product catalogs, heavy portfolio sites, or slower network connections to ensure all assets are 100% visible before taking the capture.
+- **Persistence**: Your selected delay setting is automatically saved to `~/.snapflow/config.json` and will be preserved the next time you open SnapFlow.
+
+---
+
+### 📸 Capture Modes Walkthrough
+
+1. **🖥️ Viewport Capture (`btn_screenshot_viewport`)**:
+   - Captures the exact visible area of the active browser tab.
+   - Respects the configured delay to ensure any visible hover/focus or transition animations have settled.
+
+2. **📜 Full Page Capture (`btn_screenshot_fullpage`)**:
+   - SnapFlow automatically scrolls through the entire webpage to trigger lazy-loaded images, pauses for your configured **Capture Delay**, returns to the top, and takes a seamless, high-definition full-height screenshot.
+   - **Fixed Navigation Bar Handling**: Temporarily anchors sticky navigation headers so they don't stretch or duplicate across the page, then automatically restores them to normal once the capture is complete.
+
+3. **📐 Scroll Range Capture (`btn_screenshot_range`)**:
+   - **Step 1**: Click "📐 Scroll Capture to Position" at the starting scroll offset.
+   - **Step 2**: Scroll down inside the browser window to where you want the screenshot to end.
+   - **Step 3**: Click the floating "📸 Confirm Capture" banner in SnapFlow.
+   - SnapFlow captures each segment, automatically pauses for the stabilization delay, stitches the pieces together with sub-pixel precision, and eliminates duplicate fixed headers.
+
 
 ---
 
@@ -224,7 +261,20 @@ pyinstaller --noconsole --name SnapFlow \
   main.py
 ```
 
+#### Linux Binary:
+> On Linux, path separators in `--add-data` use `:` (colon), identical to macOS:
+```bash
+pyinstaller --noconsole --onefile --name SnapFlow \
+  --icon "images/icon.png" \
+  --paths "src" \
+  --add-data "images:images" \
+  --add-data "src/i18n:i18n" \
+  --add-data "$(.venv/bin/python -c 'import customtkinter, os; print(os.path.dirname(customtkinter.__file__))'):customtkinter" \
+  main.py
+```
+
 #### Windows (`.exe`):
+> On Windows, path separators in `--add-data` use `;` (semicolon):
 ```powershell
 python -m PyInstaller --noconsole --onefile --name SnapFlow `
   --icon "images/icon.ico" `
@@ -235,8 +285,9 @@ python -m PyInstaller --noconsole --onefile --name SnapFlow `
   main.py
 ```
 
-> **Note regarding Playwright Browsers**:
-> When distributing standalone executables, the target machine should either have Google Chrome installed, or you can package Playwright browsers by setting `PLAYWRIGHT_BROWSERS_PATH=0` prior to packaging.
+> **Note regarding Playwright Browsers & macOS Native Frameworks**:
+> - When distributing standalone executables, the target machine should either have Google Chrome installed, or you can package Playwright browsers by setting `PLAYWRIGHT_BROWSERS_PATH=0` prior to packaging.
+> - On macOS, you can optionally install `pyobjc-framework-Cocoa` before building if you want native Dock icon and system language auto-detection in the standalone bundle.
 
 ---
 
@@ -275,7 +326,7 @@ SnapFlow/
 
 If you find SnapFlow helpful and it saves you time, consider buying me a coffee to support further development and maintenance!
 
-<p align="center">
+<p>
   <a href="https://buymeacoffee.com/cylee99" target="_blank">
     <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" height="50" style="height: 50px !important;">
   </a>

@@ -2,3 +2,6 @@ customtkinter>=5.2.2
 playwright>=1.44.0
 Pillow>=10.3.0
 darkdetect>=0.8.0
+
+# Optional for native macOS dock icon and system locale auto-detection:
+# pyobjc-framework-Cocoa>=10.0

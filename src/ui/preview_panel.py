@@ -19,7 +19,7 @@ from ui.dialogs import ConfirmDeleteDialog, RenameDialog
 
 
 class DragDropListbox(tk.Listbox):
-    """Tkinter Listbox supporting mouse drag-and-drop item reordering and multi-selection."""
+    """Tkinter Listbox supporting multi-selection and clean keyboard/button navigation."""
 
     def __init__(
         self,
@@ -32,14 +32,8 @@ class DragDropListbox(tk.Listbox):
         self.on_reorder = on_reorder
         self.on_select = on_select
 
-        self._drag_start_index: int | None = None
-        self._drag_candidate_index: int | None = None
-
-        self.bind("<Button-1>", self._on_button_press)
         self.bind("<Command-Button-1>", self._on_cmd_press)
         self.bind("<Control-Button-1>", self._on_ctrl_press)
-        self.bind("<B1-Motion>", self._on_mouse_drag)
-        self.bind("<ButtonRelease-1>", self._on_button_release)
         self.bind("<<ListboxSelect>>", self._on_listbox_select)
 
     def _toggle_item(self, idx: int) -> None:
@@ -49,8 +43,7 @@ class DragDropListbox(tk.Listbox):
             else:
                 self.selection_set(idx)
                 self.activate(idx)
-                if self.on_select:
-                    self.on_select(idx)
+            self._on_listbox_select(None)
 
     def _on_cmd_press(self, event: tk.Event) -> str | None:
         """macOS: CMD-click toggles selection. Win/Linux: ignored."""
@@ -69,55 +62,16 @@ class DragDropListbox(tk.Listbox):
             self._toggle_item(idx)
             return "break"
         # On macOS, Control-Button-1 is conventionally secondary/right-click.
-        # Do not force single-select or break; return None so standard OS/Tk bindings proceed.
         return None
 
-    def _on_button_press(self, event: tk.Event) -> None:
-        idx = self.nearest(event.y)
-        if 0 <= idx < self.size():
-            self._drag_candidate_index = idx
-
-    def _on_mouse_drag(self, event: tk.Event) -> None:
-        if self._drag_candidate_index is None:
-            return
-
-        # Start dragging only if a single item is selected and mouse moves to another item
-        if self._drag_start_index is None:
-            # If multiple items are selected, do not reorder or clear selections on drag
-            if len(self.curselection()) > 1:
-                return
-            target_idx = self.nearest(event.y)
-            if target_idx != self._drag_candidate_index:
-                self._drag_start_index = self._drag_candidate_index
-
-        if self._drag_start_index is None:
-            return
-
-        target_index = self.nearest(event.y)
-        if 0 <= target_index < self.size() and target_index != self._drag_start_index:
-            # Shift item locally
-            item_text = self.get(self._drag_start_index)
-            self.delete(self._drag_start_index)
-            self.insert(target_index, item_text)
-
-            self.selection_clear(0, tk.END)
-            self.selection_set(target_index)
-            self.activate(target_index)
-
-            if self.on_reorder:
-                self.on_reorder(self._drag_start_index, target_index)
-
-            self._drag_start_index = target_index
-
-    def _on_button_release(self, event: tk.Event) -> None:
-        self._drag_candidate_index = None
-        self._drag_start_index = None
-
-    def _on_listbox_select(self, event: tk.Event) -> None:
-        sel = self.curselection()
-        if sel and self.on_select:
-            # Report the last selected item for preview
-            self.on_select(sel[-1])
+    def _on_listbox_select(self, event: tk.Event | None = None) -> None:
+        if self.on_select:
+            sel = self.curselection()
+            if len(sel) == 1:
+                self.on_select(sel[0])
+            else:
+                # Multiple items selected or no selection: clear preview
+                self.on_select(-1)
 
 
 class PreviewPanel(ctk.CTkFrame):
@@ -134,9 +88,12 @@ class PreviewPanel(ctk.CTkFrame):
         self.on_list_changed = on_list_changed
         self._selected_index: int | None = None
         self._ctk_image: ctk.CTkImage | None = None
+        self._copy_timer: str | None = None
+        self._resize_timer: str | None = None
 
         self._build_ui()
         self.update_theme_colors(ctk.get_appearance_mode())
+        self.refresh_list()
 
     def _build_ui(self) -> None:
         # Left column expands (weight=1), Right preview column fixed width (weight=0)
@@ -183,6 +140,14 @@ class PreviewPanel(ctk.CTkFrame):
         scrollbar = ctk.CTkScrollbar(list_container, command=self.listbox.yview)
         scrollbar.grid(row=0, column=1, sticky="ns")
         self.listbox.configure(yscrollcommand=scrollbar.set)
+
+        # Empty state placeholder label over the listbox
+        self.lbl_empty_list = ctk.CTkLabel(
+            list_container,
+            text=f"📂 {t('label_no_screenshots')}",
+            font=ctk.CTkFont(size=13),
+            text_color=("gray50", "gray60"),
+        )
 
         # Action buttons row: [▲ Up] [▼ Down] [✏️ Rename] [🗑 Delete]
         btn_bar = ctk.CTkFrame(left_card, fg_color="transparent")
@@ -252,11 +217,20 @@ class PreviewPanel(ctk.CTkFrame):
         )
         self.image_container.grid(row=1, column=0, sticky="nsew", padx=14, pady=(0, 10))
 
+        # Empty state placeholder label for preview area (parented to right_card and placed in _parent_canvas of scroll frame for exact centering)
+        self.lbl_empty_preview = ctk.CTkLabel(
+            right_card,
+            text=f"📂 {t('label_no_screenshots')}",
+            font=ctk.CTkFont(size=13),
+            text_color=("gray50", "gray60"),
+            fg_color=("gray90", "#212121"),
+        )
+        self.lbl_empty_preview.place(in_=self.image_container._parent_canvas, relx=0.5, rely=0.5, anchor="center")
+
         self.lbl_image_display = ctk.CTkLabel(
             self.image_container,
-            text=t("label_no_screenshots"),
+            text="",
             font=ctk.CTkFont(size=14),
-            text_color=("gray40", "gray65"),
         )
         self.lbl_image_display.pack(expand=True, fill="both", padx=4, pady=4)
 
@@ -317,6 +291,8 @@ class PreviewPanel(ctk.CTkFrame):
                 highlightbackground="#343A40",
                 highlightcolor="#1F6AA5",
             )
+            self.lbl_empty_list.configure(fg_color="#23272D", text_color="#8A94A6")
+            self.lbl_empty_preview.configure(fg_color="#212121", text_color="#8A94A6")
         else:
             self.listbox.configure(
                 bg="#FFFFFF",
@@ -326,6 +302,8 @@ class PreviewPanel(ctk.CTkFrame):
                 highlightbackground="#D1D5DB",
                 highlightcolor="#3B8ED0",
             )
+            self.lbl_empty_list.configure(fg_color="#FFFFFF", text_color="#718096")
+            self.lbl_empty_preview.configure(fg_color="gray90", text_color="#718096")
 
     def refresh_ui_texts(self) -> None:
         """Dynamically refreshes all label and button texts according to active locale."""
@@ -336,9 +314,8 @@ class PreviewPanel(ctk.CTkFrame):
         self.btn_rename.configure(text=t("btn_rename"))
         self.btn_delete.configure(text=t("btn_delete"))
         self.btn_copy_url.configure(text=t("btn_copy_url"))
-
-        if self.model.count() == 0:
-            self.lbl_image_display.configure(text=t("label_no_screenshots"))
+        self.lbl_empty_list.configure(text=f"📂 {t('label_no_screenshots')}")
+        self.lbl_empty_preview.configure(text=f"📂 {t('label_no_screenshots')}")
 
         # Re-render list and active item preview metadata
         self.refresh_list(select_index=self._selected_index)
@@ -348,9 +325,14 @@ class PreviewPanel(ctk.CTkFrame):
         if hasattr(self, "_last_listbox_width") and abs(self._last_listbox_width - event.width) < 5:
             return
         self._last_listbox_width = event.width
-        # Debounce or update item texts if we have items
+        # Debounce item texts update if we have items
         if self.model.count() > 0:
-            self._update_list_display_texts()
+            if self._resize_timer is not None:
+                try:
+                    self.after_cancel(self._resize_timer)
+                except Exception:
+                    pass
+            self._resize_timer = self.after(80, self._update_list_display_texts)
 
     def _format_item_text(self, idx: int, shot: Screenshot, available_px: int, font: tkfont.Font) -> str:
         """Dynamically fits the screenshot item string into the available pixel width."""
@@ -424,6 +406,7 @@ class PreviewPanel(ctk.CTkFrame):
 
         count = self.model.count()
         if count > 0:
+            self.lbl_empty_list.place_forget()
             if select_index is not None and 0 <= select_index < count:
                 idx_to_select = select_index
             elif self._selected_index is not None and 0 <= self._selected_index < count:
@@ -438,6 +421,7 @@ class PreviewPanel(ctk.CTkFrame):
             self._handle_select(idx_to_select)
         else:
             self._selected_index = None
+            self.lbl_empty_list.place(relx=0.5, rely=0.5, anchor="center")
             self._clear_preview()
 
         if self.on_list_changed:
@@ -467,6 +451,7 @@ class PreviewPanel(ctk.CTkFrame):
             shot = self.model.shots[index]
             self._show_preview(shot)
         else:
+            self._selected_index = None
             self._clear_preview()
 
         if self.on_list_changed:
@@ -499,6 +484,7 @@ class PreviewPanel(ctk.CTkFrame):
                 except Exception:
                     pass
 
+                self.lbl_empty_preview.place_forget()
                 self.lbl_image_display.configure(
                     image=self._ctk_image,
                     text="",
@@ -542,10 +528,11 @@ class PreviewPanel(ctk.CTkFrame):
         try:
             self.lbl_image_display.configure(
                 image=None,
-                text=t("label_no_screenshots"),
+                text="",
             )
         except Exception:
             pass
+        self.lbl_empty_preview.place(in_=self.image_container._parent_canvas, relx=0.5, rely=0.5, anchor="center")
         self.lbl_meta_title.configure(text="")
         self.lbl_meta_url.configure(text="")
         self.btn_copy_url.pack_forget()
@@ -558,10 +545,26 @@ class PreviewPanel(ctk.CTkFrame):
         self.clipboard_append(self._current_full_url)
         self.update()
 
+        # Cancel previous timer if active to prevent race condition
+        if self._copy_timer:
+            try:
+                self.after_cancel(self._copy_timer)
+            except Exception:
+                pass
+            self._copy_timer = None
+
         # Temporary button text feedback
         orig_text = f"📋 {t('btn_copy_url')}"
         self.btn_copy_url.configure(text="✓ Copied!")
-        self.after(1500, lambda: self.btn_copy_url.configure(text=orig_text))
+
+        def reset_copy_btn():
+            self._copy_timer = None
+            try:
+                self.btn_copy_url.configure(text=orig_text)
+            except Exception:
+                pass
+
+        self._copy_timer = self.after(1500, reset_copy_btn)
 
     def get_selected_indices(self) -> list[int]:
         """Returns all currently selected indices, or [active_index] if fallback."""

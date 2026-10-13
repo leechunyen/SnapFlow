@@ -61,17 +61,23 @@ class Toolbar(ctk.CTkFrame):
         self._build_ui()
 
     def _build_ui(self) -> None:
-        # Row 1: Browser Launch, New Tab, and stacked Language/Theme settings
-        row1 = ctk.CTkFrame(self, fg_color="transparent")
-        row1.pack(fill="x", padx=16, pady=(10, 4))
+        # Top Flex Container: Two Columns (Left Column & Right Column)
+        flex_container = ctk.CTkFrame(self, fg_color="transparent")
+        flex_container.pack(fill="x", padx=16, pady=(8, 4))
 
-        # Left controls of Row 1: Launch and New Tab
-        r1_left = ctk.CTkFrame(row1, fg_color="transparent")
-        r1_left.pack(side="left")
+        left_col = ctk.CTkFrame(flex_container, fg_color="transparent")
+        left_col.pack(side="left", fill="both", expand=True)
 
-        # Launch button
+        right_col = ctk.CTkFrame(flex_container, fg_color="transparent")
+        right_col.pack(side="right", fill="y", padx=(16, 0))
+
+        # ----------------- Left Column (上下排) -----------------
+        # L1: Launch Browser & New Tab
+        l_row1 = ctk.CTkFrame(left_col, fg_color="transparent")
+        l_row1.pack(fill="x", pady=(0, 6))
+
         self.btn_launch = ctk.CTkButton(
-            r1_left,
+            l_row1,
             text=t("btn_launch_browser"),
             font=ctk.CTkFont(size=13, weight="bold"),
             command=self.on_launch,
@@ -80,9 +86,8 @@ class Toolbar(ctk.CTkFrame):
         )
         self.btn_launch.pack(side="left", padx=(0, 8))
 
-        # New tab button
         self.btn_new_tab = ctk.CTkButton(
-            r1_left,
+            l_row1,
             text=f"➕ {t('btn_new_tab')}",
             command=self.on_new_tab,
             state="disabled",
@@ -93,12 +98,112 @@ class Toolbar(ctk.CTkFrame):
         )
         self.btn_new_tab.pack(side="left")
 
-        # Right controls of Row 1: Language and Theme stacked vertically (上下排)
-        settings_frame = ctk.CTkFrame(row1, fg_color="transparent")
-        settings_frame.pack(side="right")
+        # L2: Tabs dropdown and active page info
+        l_row2 = ctk.CTkFrame(left_col, fg_color="transparent")
+        l_row2.pack(fill="x", pady=(0, 6))
 
-        # Sub-row for Language
-        lang_row = ctk.CTkFrame(settings_frame, fg_color="transparent")
+        self.tab_selector_frame = ctk.CTkFrame(l_row2, fg_color="transparent")
+        self.tab_selector_frame.pack(side="left", padx=(0, 10))
+
+        self.lbl_tab_prompt = ctk.CTkLabel(
+            self.tab_selector_frame,
+            text=t("label_tab"),
+            font=ctk.CTkFont(size=12, weight="bold"),
+        )
+        self.lbl_tab_prompt.pack(side="left", padx=(0, 4))
+
+        self.tab_var = ctk.StringVar(value="--")
+        self.tab_menu = ctk.CTkOptionMenu(
+            self.tab_selector_frame,
+            values=["--"],
+            variable=self.tab_var,
+            command=self._handle_tab_selected,
+            width=280,
+            height=28,
+            state="disabled",
+        )
+        self.tab_menu.pack(side="left")
+
+        self.lbl_page_status = ctk.CTkLabel(
+            l_row2,
+            text=f"🌐 {t('label_no_browser')}",
+            font=ctk.CTkFont(size=12),
+            text_color=("gray40", "gray70"),
+            anchor="w",
+        )
+        self.lbl_page_status.pack(side="left", fill="x", expand=True)
+
+        # L3: Delay slider
+        l_row3 = ctk.CTkFrame(left_col, fg_color="transparent")
+        l_row3.pack(fill="x", pady=(0, 6))
+
+        self.lbl_delay = ctk.CTkLabel(
+            l_row3,
+            text=t("label_delay"),
+            font=ctk.CTkFont(size=11, weight="bold"),
+        )
+        self.lbl_delay.pack(side="left", padx=(0, 4))
+
+        initial_delay = self.config_mgr.capture_delay
+        self.slider_delay = ctk.CTkSlider(
+            l_row3,
+            from_=1,
+            to=5,
+            number_of_steps=4,
+            width=110,
+            command=self._handle_delay_slider_change,
+        )
+        self.slider_delay.set(initial_delay)
+        self.slider_delay.pack(side="left", padx=(0, 4))
+
+        self.lbl_delay_val = ctk.CTkLabel(
+            l_row3,
+            text=f"{initial_delay}s",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            width=24,
+            anchor="w",
+        )
+        self.lbl_delay_val.pack(side="left")
+
+        # L4: 3 Capture buttons (Viewport, Full Page, Range)
+        l_row4 = ctk.CTkFrame(left_col, fg_color="transparent")
+        l_row4.pack(fill="x", pady=(0, 2))
+
+        # Viewport screenshot button
+        self.btn_viewport = ctk.CTkButton(
+            l_row4,
+            text=t("btn_screenshot_viewport"),
+            command=self.on_viewport,
+            state="disabled",
+            height=30,
+        )
+        self.btn_viewport.pack(side="left", padx=(0, 6))
+
+        # Full page screenshot button
+        self.btn_fullpage = ctk.CTkButton(
+            l_row4,
+            text=t("btn_screenshot_fullpage"),
+            command=self.on_fullpage,
+            state="disabled",
+            height=30,
+        )
+        self.btn_fullpage.pack(side="left", padx=(0, 6))
+
+        # Range screenshot button
+        self.btn_range = ctk.CTkButton(
+            l_row4,
+            text=t("btn_screenshot_range"),
+            command=self._handle_range_button_click,
+            state="disabled",
+            height=30,
+            fg_color="#6A1B9A",
+            hover_color="#4A148C",
+        )
+        self.btn_range.pack(side="left")
+
+        # ----------------- Right Column (上下排) -----------------
+        # R1: Language Selector
+        lang_row = ctk.CTkFrame(right_col, fg_color="transparent")
         lang_row.pack(fill="x", pady=(0, 3))
 
         self.lang_lbl = ctk.CTkLabel(
@@ -124,8 +229,8 @@ class Toolbar(ctk.CTkFrame):
         )
         self.lang_menu.pack(side="left")
 
-        # Sub-row for Theme
-        theme_row = ctk.CTkFrame(settings_frame, fg_color="transparent")
+        # R2: Theme Selector
+        theme_row = ctk.CTkFrame(right_col, fg_color="transparent")
         theme_row.pack(fill="x", pady=(0, 3))
 
         self.theme_lbl = ctk.CTkLabel(
@@ -151,127 +256,63 @@ class Toolbar(ctk.CTkFrame):
         )
         self.theme_menu.pack(side="left")
 
-        # Sub-row for Buy Me a Coffee (under Theme) - prominent & eye-catching
-        donate_row = ctk.CTkFrame(settings_frame, fg_color="transparent")
-        donate_row.pack(fill="x", pady=(4, 0))
+        # R3: Buy Me a Coffee Button
+        donate_row = ctk.CTkFrame(right_col, fg_color="transparent")
+        donate_row.pack(fill="x", pady=(3, 2))
 
         self.btn_donate = ctk.CTkButton(
             donate_row,
             text=t("btn_donate"),
-            font=ctk.CTkFont(size=13, weight="bold"),
+            font=ctk.CTkFont(size=12, weight="bold"),
             fg_color="#FF813F",
             hover_color="#E66A28",
             text_color="#FFFFFF",
-            corner_radius=8,
-            height=32,
+            corner_radius=6,
+            height=26,
             command=self._open_donation_link,
         )
         self.btn_donate.pack(fill="x")
 
-        # Row 2 (獨立一排): Tab selector dropdown and active page info
-        row2 = ctk.CTkFrame(self, fg_color="transparent")
-        row2.pack(fill="x", padx=16, pady=(3, 3))
+        # R4: GitHub Link Button
+        github_row = ctk.CTkFrame(right_col, fg_color="transparent")
+        github_row.pack(fill="x", pady=(2, 2))
 
-        # Tab dropdown selector frame
-        self.tab_selector_frame = ctk.CTkFrame(row2, fg_color="transparent")
-        self.tab_selector_frame.pack(side="left", padx=(0, 10))
-
-        self.lbl_tab_prompt = ctk.CTkLabel(
-            self.tab_selector_frame,
-            text=t("label_tab"),
+        self.btn_github = ctk.CTkButton(
+            github_row,
+            text="GitHub",
             font=ctk.CTkFont(size=12, weight="bold"),
+            fg_color=("#24292E", "#24292E"),
+            hover_color=("#1B1F23", "#1B1F23"),
+            text_color="#FFFFFF",
+            corner_radius=6,
+            height=26,
+            command=self._open_github_link,
         )
-        self.lbl_tab_prompt.pack(side="left", padx=(0, 4))
+        self.btn_github.pack(fill="x")
 
-        self.tab_var = ctk.StringVar(value="--")
-        self.tab_menu = ctk.CTkOptionMenu(
-            self.tab_selector_frame,
-            values=["--"],
-            variable=self.tab_var,
-            command=self._handle_tab_selected,
-            width=280,
-            height=28,
-            state="disabled",
+        # R5: Version & Developer info
+        info_row = ctk.CTkFrame(right_col, fg_color="transparent")
+        info_row.pack(fill="x", pady=(0, 0))
+
+        self.lbl_version = ctk.CTkLabel(
+            info_row,
+            text="Version: 1.0",
+            font=ctk.CTkFont(size=11, weight="bold"),
+            text_color=("gray30", "gray75"),
+            anchor="center",
+            height=16,
         )
-        self.tab_menu.pack(side="left")
+        self.lbl_version.pack(fill="x", pady=(1, 0))
 
-        # Page status / URL display (fills remainder of Row 2)
-        self.lbl_page_status = ctk.CTkLabel(
-            row2,
-            text=f"🌐 {t('label_no_browser')}",
-            font=ctk.CTkFont(size=12),
+        self.lbl_author = ctk.CTkLabel(
+            info_row,
+            text="Developer: cylee",
+            font=ctk.CTkFont(size=11),
             text_color=("gray40", "gray70"),
-            anchor="w",
+            anchor="center",
+            height=16,
         )
-        self.lbl_page_status.pack(side="left", fill="x", expand=True)
-
-        # Row 3: 3 Capture buttons (下一排)
-        row3 = ctk.CTkFrame(self, fg_color="transparent")
-        row3.pack(fill="x", padx=16, pady=(3, 8))
-
-        # Viewport screenshot button
-        self.btn_viewport = ctk.CTkButton(
-            row3,
-            text=t("btn_screenshot_viewport"),
-            command=self.on_viewport,
-            state="disabled",
-            height=30,
-        )
-        self.btn_viewport.pack(side="left", padx=(0, 6))
-
-        # Full page screenshot button
-        self.btn_fullpage = ctk.CTkButton(
-            row3,
-            text=t("btn_screenshot_fullpage"),
-            command=self.on_fullpage,
-            state="disabled",
-            height=30,
-        )
-        self.btn_fullpage.pack(side="left", padx=(0, 6))
-
-        # Range screenshot button
-        self.btn_range = ctk.CTkButton(
-            row3,
-            text=t("btn_screenshot_range"),
-            command=self._handle_range_button_click,
-            state="disabled",
-            height=30,
-            fg_color="#6A1B9A",
-            hover_color="#4A148C",
-        )
-        self.btn_range.pack(side="left")
-
-        # Right side of Row 3: Capture delay slider (1s - 5s) for JS/animations settling
-        delay_frame = ctk.CTkFrame(row3, fg_color="transparent")
-        delay_frame.pack(side="right")
-
-        self.lbl_delay = ctk.CTkLabel(
-            delay_frame,
-            text=t("label_delay"),
-            font=ctk.CTkFont(size=11, weight="bold"),
-        )
-        self.lbl_delay.pack(side="left", padx=(0, 4))
-
-        initial_delay = self.config_mgr.capture_delay
-        self.slider_delay = ctk.CTkSlider(
-            delay_frame,
-            from_=1,
-            to=5,
-            number_of_steps=4,
-            width=100,
-            command=self._handle_delay_slider_change,
-        )
-        self.slider_delay.set(initial_delay)
-        self.slider_delay.pack(side="left", padx=(0, 4))
-
-        self.lbl_delay_val = ctk.CTkLabel(
-            delay_frame,
-            text=f"{initial_delay}s",
-            font=ctk.CTkFont(size=11, weight="bold"),
-            width=24,
-            anchor="w",
-        )
-        self.lbl_delay_val.pack(side="left")
+        self.lbl_author.pack(fill="x", pady=(0, 0))
 
         # Range capture interactive banner (hidden by default)
         self.range_banner = ctk.CTkFrame(self, fg_color=("#EDE7F6", "#311B92"), corner_radius=8)
@@ -481,14 +522,6 @@ class Toolbar(ctk.CTkFrame):
         self.lang_lbl.configure(text=t("label_language"))
         self.theme_lbl.configure(text=t("label_theme"))
         self.btn_donate.configure(text=t("btn_donate"))
-
-    def _handle_delay_slider_change(self, value: float) -> None:
-        """Triggered when user adjusts the capture delay slider (1s to 5s)."""
-        int_val = int(round(value))
-        self.lbl_delay_val.configure(text=f"{int_val}s")
-        if self.on_delay_changed:
-            self.on_delay_changed(int_val)
-
         cur_locale = get_current_locale()
         self.lang_var.set(LOCALE_TO_LANG.get(cur_locale, "English"))
 
@@ -497,6 +530,13 @@ class Toolbar(ctk.CTkFrame):
         self.theme_var.set(self._config_to_display_theme(self.config_mgr.theme))
 
         self.set_active_page_info(self._current_page_title, self._current_page_url)
+
+    def _handle_delay_slider_change(self, value: float) -> None:
+        """Triggered when user adjusts the capture delay slider (1s to 5s)."""
+        int_val = int(round(value))
+        self.lbl_delay_val.configure(text=f"{int_val}s")
+        if self.on_delay_changed:
+            self.on_delay_changed(int_val)
 
     def _config_to_display_theme(self, mode: str) -> str:
         if mode == "dark":
@@ -523,3 +563,7 @@ class Toolbar(ctk.CTkFrame):
     def _open_donation_link(self) -> None:
         """Opens user's Buy Me a Coffee page in system's default web browser."""
         webbrowser.open_new_tab("https://buymeacoffee.com/cylee99")
+
+    def _open_github_link(self) -> None:
+        """Opens project GitHub repository in system's default web browser."""
+        webbrowser.open_new_tab("https://github.com/leechunyen/SnapFlow.git")
