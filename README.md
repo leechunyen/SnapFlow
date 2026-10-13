@@ -298,6 +298,7 @@ SnapFlow/
 ├── main.py                  # Entry point, CLI argument parsing, sys.path configuration
 ├── requirements.txt         # Project dependencies
 ├── README.md                # Project documentation
+├── LICENSE                  # GNU General Public License v3.0
 ├── .gitignore               # Git ignore rules
 ├── images/                  # Application icons (.icns, .ico, .svg, .png)
 └── src/                     # Core source code
@@ -321,6 +322,12 @@ SnapFlow/
         ├── file_utils.py    # Temp workspace creation, safe path operations, lifecycle cleanup
         └── image_utils.py   # Thumbnail generation, RGB conversions, PDF export, PNG sanitization
 ```
+
+## 📄 License
+
+This project is licensed under the [GNU General Public License v3.0 (GPL-3.0)](LICENSE).
+
+---
 
 ## ☕ Support
 
